@@ -8,32 +8,47 @@ pipeline {
             }
         }
 
-        stage('Generate Doxygen Config') {
+        stage('Generate Config') {
             steps {
-                sh 'doxygen -g Doxyfile'
+                bat 'doxygen -g Doxyfile'
             }
         }
 
         stage('Modify Config') {
             steps {
-                sh '''
-                sed -i 's|^INPUT .*|INPUT = src|' Doxyfile
-                sed -i 's|^GENERATE_HTML .*|GENERATE_HTML = YES|' Doxyfile
-                sed -i 's|^GENERATE_LATEX .*|GENERATE_LATEX = NO|' Doxyfile
+                powershell '''
+                (Get-Content Doxyfile) `
+                  -replace '^INPUT .*', 'INPUT = src' `
+                  -replace '^GENERATE_HTML .*', 'GENERATE_HTML = YES' `
+                  -replace '^GENERATE_LATEX .*', 'GENERATE_LATEX = NO' |
+                Set-Content Doxyfile
+
+                Add-Content Doxyfile "WARN_LOGFILE = warnings.log"
                 '''
             }
         }
 
         stage('Run Doxygen') {
             steps {
-                sh 'doxygen Doxyfile'
+                bat 'doxygen Doxyfile'
             }
         }
 
-        stage('Archive Docs') {
+        stage('Clone RepoC') {
             steps {
-                sh 'tar -czf doc.tar.gz html'
-                archiveArtifacts artifacts: 'doc.tar.gz'
+                git 'https://github.com/JeremiahJhon/RepoC.git'
+            }
+        }
+
+        stage('Run Parser') {
+            steps {
+                bat 'python parser.py warnings.log'
+            }
+        }
+
+        stage('Archive Output') {
+            steps {
+                archiveArtifacts artifacts: '*.csv'
             }
         }
     }
